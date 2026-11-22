@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Công cụ tách Main Domain & Lọc Subdomain (PSL chuẩn)</title>
+  <!-- Thư viện Public Suffix List chính xác cho co.in, com.mx, com.co, in.net... -->
+  <script src="https://cdn.jsdelivr.net/npm/tldts@7/dist/index.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface-2: #0b1220;
+      --border: #334155;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --success: #10b981;
+      --success-hover: #059669;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --radius: 10px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 24px 16px 60px;
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.45rem;
+      font-weight: 700;
+    }
+
+    .subtitle {
+      margin: 4px 0 0;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    .badge.ok {
+      color: #6ee7b7;
+      border-color: rgba(16, 185, 129, 0.4);
+      background: rgba(16, 185, 129, 0.1);
+    }
+
+    .badge.fallback {
+      color: #fcd34d;
+      border-color: rgba(245, 158, 11, 0.4);
+      background: rgba(245, 158, 11, 0.1);
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      margin-bottom: 20px;
+    }
+
+    .card-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .step-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: var(--primary);
+      color: #fff;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 170px;
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.86rem;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    textarea:focus {
+      border-color: var(--primary);
+    }
+
+    textarea.drag-over {
+      border-color: var(--success);
+      background: rgba(16, 185, 129, 0.08);
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .options-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 14px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    label.checkbox {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    button {
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 0.86rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--primary-hover);
+    }
+
+    .btn-success {
+      background: var(--success);
+      color: #042f2e;
+    }
+
+    .btn-success:hover:not(:disabled) {
+      background: var(--success-hover);
+      color: #fff;
+    }
+
+    .btn-secondary {
+      background: var(--surface-2);
+      color: var(--text);
+      border-color: var(--border);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      border-color: #64748b;
+    }
+
+    .btn-danger {
+      background: transparent;
+      color: #fca5a5;
+      border-color: rgba(239, 68, 68, 0.35);
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background: rgba(239, 68, 68, 0.15);
+    }
+
+    .stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .stat-pill {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 0.84rem;
+      color: var(--muted);
+    }
+
+    .stat-pill strong {
+      color: var(--text);
+      margin-left: 4px;
+    }
+
+    .search-input {
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 7px 12px;
+      font-size: 0.85rem;
+      min-width: 220px;
+      outline: none;
+    }
+
+    .search-input:focus {
+      border-color: var(--primary);
+    }
+
+    .table-wrap {
+      max-height: 380px;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface-2);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.86rem;
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      background: #162033;
+      color: var(--muted);
+      text-align: left;
+      font-weight: 600;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      z-index: 1;
+    }
+
+    tbody td {
+      padding: 8px 12px;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.55);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      word-break: break-all;
+    }
+
+    tbody tr:hover {
+      background: rgba(59, 130, 246, 0.08);
+    }
+
+    .col-idx {
+      width: 56px;
+      color: var(--muted);
+    }
+
+    .empty-state {
+      text-align: center;
+      color: var(--muted);
+      padding: 28px 12px;
+      font-family: inherit !important;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 900px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .tag-main {
+      color: #93c5fd;
+    }
+
+    .tag-sub {
+      color: #6ee7b7;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #10b981;
+      color: #022c22;
+      font-weight: 600;
+      padding: 10px 16px;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: all 0.2s ease;
+      z-index: 999;
+      font-size: 0.9rem;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .hint {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>Công cụ tách Main Domain &amp; Truy xuất Subdomain</h1>
+        <p class="subtitle">Chỉ lấy domain có subdomain (bỏ <code>www.</code> và domain gốc). Hỗ trợ <code>.co.in</code>, <code>.com.mx</code>, <code>.com.co</code>, <code>.in.net</code>...</p>
+      </div>
+      <div id="pslStatus" class="badge">Đang kiểm tra bộ phân tích PSL...</div>
+    </header>
+
+    <!-- BƯỚC 1: NHẬP DANH SÁCH URL -->
+    <section class="card">
+      <div class="card-header">
+        <h2 class="card-title"><span class="step-num">1</span> Thả hoặc dán danh sách URL đầu vào</h2>
+        <div class="btn-group">
+          <button type="button" class="btn-secondary" id="btnSample">Dùng dữ liệu mẫu</button>
+          <button type="button" class="btn-danger" id="btnClearInput">Xóa trắng</button>
+        </div>
+      </div>
+
+      <textarea
+        id="urlInput"
+        placeholder="Dán danh sách URL hoặc kéo thả file .txt/.csv vào đây (mỗi dòng 1 URL)...&#10;Ví dụ:&#10;https://help.yuntuweb.vip/&#10;https://pro.789club.co.in/&#10;https://api.shop.com.mx/v1&#10;https://cdn.example.in.net/app"
+      ></textarea>
+
+      <div class="toolbar">
+        <div class="options-group">
+          <label class="checkbox">
+            <input type="checkbox" id="optAllowPrivate" checked />
+            Hỗ trợ đuôi đặc biệt / Private PSL (vd: <code>.in.net</code>, <code>.uk.com</code>, <code>.eu.com</code>)
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" id="optDedup" checked />
+            Gộp cặp trùng lặp
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" id="optExcludeWww" checked />
+            Bỏ qua subdomain <code>www.</code> (không lấy)
+          </label>
+        </div>
+        <div class="btn-group">
+          <button type="button" class="btn-primary" id="btnParse">Phân tích ngay</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- BƯỚC 2: BẢNG KẾT QUẢ & COPY MAIN DOMAIN -->
+    <section class="card">
+      <div class="card-header">
+        <h2 class="card-title"><span class="step-num">2</span> Bảng dữ liệu Main Domain &amp; Subdomain (chỉ hiện domain có subdomain)</h2>
+        <div class="btn-group">
+          <input type="text" id="filterTableInput" class="search-input" placeholder="Lọc nhanh main/subdomain..." />
+          <button type="button" class="btn-success" id="btnCopyMainDomains" disabled>
+            Copy danh sách Main Domain (để check Namecheap)
+          </button>
+          <button type="button" class="btn-secondary" id="btnCopyMainSubCsv" disabled>
+            Copy 2 cột (Excel)
+          </button>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat-pill">URL lấy được:<strong id="statValid">0</strong></div>
+        <div class="stat-pill">Dòng hiển thị:<strong id="statRows">0</strong></div>
+        <div class="stat-pill">Main Domain duy nhất:<strong id="statUniqueMain">0</strong></div>
+        <div class="stat-pill">Subdomain duy nhất:<strong id="statUniqueSub">0</strong></div>
+        <div class="stat-pill">Bỏ qua (không sub / www / lỗi):<strong id="statSkipped">0</strong></div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="col-idx">#</th>
+              <th>Main Domain</th>
+              <th>Subdomain</th>
+            </tr>
+          </thead>
+          <tbody id="parsedTableBody">
+            <tr>
+              <td colspan="3" class="empty-state">Chưa có dữ liệu. Hãy dán danh sách URL ở Bước 1.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- BƯỚC 3: THẢ DANH SÁCH MAIN DOMAIN MUA ĐƯỢC -> RA SUBDOMAIN TƯƠNG ỨNG -->
+    <section class="card">
+      <div class="card-header">
+        <h2 class="card-title"><span class="step-num">3</span> Thả danh sách Main Domain mua được để lấy Subdomain tương ứng</h2>
+        <div class="btn-group">
+          <button type="button" class="btn-danger" id="btnClearAvail">Xóa</button>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div>
+          <label for="availableInput" style="display:block; font-size:0.86rem; font-weight:600; margin-bottom:6px;">
+            Dán danh sách Main Domain khả dụng từ Namecheap:
+          </label>
+          <textarea
+            id="availableInput"
+            placeholder="Dán các Main Domain mua được vào đây (có thể dán nguyên đoạn text copy từ Namecheap)...&#10;Ví dụ:&#10;yuntuweb.vip&#10;789club.co.in"
+          ></textarea>
+          <p class="hint">Mẹo: Hệ thống tự lọc tên miền hợp lệ kể cả khi dòng bị dính giá tiền hoặc chữ "Available".</p>
+        </div>
+
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap;">
+            <label for="matchedSubOutput" style="font-size:0.86rem; font-weight:600;">
+              Danh sách Subdomain tương ứng (<span id="matchedSubCount">0</span>):
+            </label>
+            <div class="btn-group">
+              <label class="checkbox" style="font-size:0.82rem; color:var(--muted);">
+                <input type="checkbox" id="optPrefixHttps" />
+                Thêm <code>https://</code>
+              </label>
+              <button type="button" class="btn-success" id="btnCopyMatchedSubs" disabled>
+                Copy Subdomain
+              </button>
+              <button type="button" class="btn-secondary" id="btnCopyMatchedPairs" disabled>
+                Copy 2 cột
+              </button>
+            </div>
+          </div>
+          <textarea
+            id="matchedSubOutput"
+            readonly
+            placeholder="Subdomain tương ứng của các Main Domain mua được sẽ hiện ở đây..."
+          ></textarea>
+          <p class="hint" id="matchedHint">Khớp: 0 Main Domain | Không tìm thấy trong Bước 1: 0</p>
+        </div>
+      </div>
+
+      <div class="table-wrap" style="margin-top: 14px;">
+        <table>
+          <thead>
+            <tr>
+              <th class="col-idx">#</th>
+              <th>Main Domain (mua được)</th>
+              <th>Subdomain tương ứng</th>
+            </tr>
+          </thead>
+          <tbody id="matchedTableBody">
+            <tr>
+              <td colspan="3" class="empty-state">Dán danh sách Main Domain mua được vào ô bên trái để xem kết quả đối chiếu.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast">Đã sao chép!</div>
+
+  <script>
+    (function () {
+      // Danh sách hậu tố nhiều cấp dự phòng nếu trình duyệt offline hoặc không tải được CDN tldts
+      const FALLBACK_MULTI_SUFFIXES = new Set([
+        "co.in", "net.in", "org.in", "firm.in", "gen.in", "ind.in", "ac.in", "edu.in", "gov.in", "res.in",
+        "com.mx", "net.mx", "org.mx", "gob.mx", "edu.mx",
+        "com.co", "net.co", "org.co", "nom.co", "edu.co", "gov.co", "mil.co",
+        "in.net", "uk.com", "uk.net", "eu.com", "us.com", "us.org", "cn.com", "de.com", "jpn.com",
+        "kr.com", "ru.com", "sa.com", "se.com", "se.net", "za.com", "br.com", "ar.com", "hu.com",
+        "hu.net", "jp.net", "no.com", "qc.com", "gb.com", "gb.net", "gr.com", "mex.com", "ae.org",
+        "com.vn", "net.vn", "org.vn", "edu.vn", "gov.vn", "int.vn", "ac.vn", "biz.vn", "info.vn", "name.vn", "pro.vn", "health.vn",
+        "co.uk", "org.uk", "me.uk", "ltd.uk", "plc.uk", "net.uk", "sch.uk", "ac.uk", "gov.uk",
+        "com.au", "net.au", "org.au", "edu.au", "gov.au", "asn.au", "id.au",
+        "com.br", "net.br", "org.br", "gov.br", "edu.br",
+        "co.jp", "ne.jp", "or.jp", "ac.jp", "go.jp", "ed.jp", "gr.jp", "lg.jp",
+        "com.tw", "net.tw", "org.tw", "edu.tw", "gov.tw", "idv.tw",
+        "com.hk", "net.hk", "org.hk", "edu.hk", "gov.hk", "idv.hk",
+        "co.kr", "ne.kr", "or.kr", "re.kr", "pe.kr", "go.kr", "ac.kr",
+        "com.sg", "net.sg", "org.sg", "edu.sg", "gov.sg", "per.sg",
+        "co.th", "in.th", "ac.th", "go.th", "or.th", "mi.th", "net.th",
+        "co.id", "web.id", "my.id", "biz.id", "or.id", "ac.id", "sch.id", "go.id", "net.id",
+        "com.my", "net.my", "org.my", "edu.my", "gov.my",
+        "com.ph", "net.ph", "org.ph",
+        "co.nz", "net.nz", "org.nz", "govt.nz", "ac.nz", "geek.nz", "maori.nz",
+        "com.tr", "net.tr", "org.tr", "gen.tr", "biz.tr", "info.tr", "web.tr",
+        "com.ar", "net.ar", "org.ar", "com.pe", "net.pe", "org.pe",
+        "com.ec", "net.ec", "org.ec", "com.ve", "net.ve", "org.ve",
+        "com.uy", "com.py", "com.bo", "com.gt", "com.sv", "com.hn", "com.ni", "com.cr", "co.cr", "com.pa", "com.do", "com.cu", "com.pr",
+        "co.za", "org.za", "net.za", "web.za", "com.ng", "org.ng", "com.eg", "co.ke", "or.ke", "co.tz", "co.ug", "com.gh",
+        "com.ua", "in.ua", "kiev.ua", "com.pl", "net.pl", "org.pl", "waw.pl",
+        "co.il", "org.il", "net.il", "com.sa", "com.ae", "co.ae", "com.qa", "com.kw", "com.om", "com.bh",
+        "com.cn", "net.cn", "org.cn", "gov.cn", "edu.cn", "com.ru", "net.ru", "org.ru", "pp.ru",
+        "co.cc", "com.es", "nom.es", "org.es", "com.pt", "com.fr", "asso.fr", "co.it", "com.de", "co.at", "or.at",
+        "com.bd", "com.pk", "net.pk", "org.pk", "com.np", "com.lk", "com.mm", "com.kh", "com.la", "com.bn"
+      ]);
+
+      // Elements
+      const pslStatusEl = document.getElementById("pslStatus");
+      const urlInput = document.getElementById("urlInput");
+      const optAllowPrivate = document.getElementById("optAllowPrivate");
+      const optDedup = document.getElementById("optDedup");
+      const optExcludeWww = document.getElementById("optExcludeWww");
+      const btnSample = document.getElementById("btnSample");
+      const btnClearInput = document.getElementById("btnClearInput");
+      const btnParse = document.getElementById("btnParse");
+
+      const filterTableInput = document.getElementById("filterTableInput");
+      const btnCopyMainDomains = document.getElementById("btnCopyMainDomains");
+      const btnCopyMainSubCsv = document.getElementById("btnCopyMainSubCsv");
+      const parsedTableBody = document.getElementById("parsedTableBody");
+
+      const statValid = document.getElementById("statValid");
+      const statRows = document.getElementById("statRows");
+      const statUniqueMain = document.getElementById("statUniqueMain");
+      const statUniqueSub = document.getElementById("statUniqueSub");
+      const statSkipped = document.getElementById("statSkipped");
+
+      const availableInput = document.getElementById("availableInput");
+      const btnClearAvail = document.getElementById("btnClearAvail");
+      const optPrefixHttps = document.getElementById("optPrefixHttps");
+      const btnCopyMatchedSubs = document.getElementById("btnCopyMatchedSubs");
+      const btnCopyMatchedPairs = document.getElementById("btnCopyMatchedPairs");
+      const matchedSubOutput = document.getElementById("matchedSubOutput");
+      const matchedSubCount = document.getElementById("matchedSubCount");
+      const matchedHint = document.getElementById("matchedHint");
+      const matchedTableBody = document.getElementById("matchedTableBody");
+      const toastEl = document.getElementById("toast");
+
+      // State
+      let parsedRows = []; // { mainDomain, subdomain }
+      let uniqueMainDomains = []; // ordered unique list
+      let mainToSubsMap = new Map(); // mainDomain -> Set of full subdomains
+      let allMainDomainSet = new Set();
+      let matchedPairs = []; // { mainDomain, subdomain }
+      let matchedSubList = []; // unique subdomains
+      let toastTimer = null;
+
+      // Check tldts status
+      const hasTldts = typeof window.tldts !== "undefined" && typeof window.tldts.parse === "function";
+      if (hasTldts) {
+        pslStatusEl.textContent = "PSL đầy đủ (tldts) đang hoạt động";
+        pslStatusEl.classList.add("ok");
+      } else {
+        pslStatusEl.textContent = "Chế độ dự phòng (offline PSL)";
+        pslStatusEl.classList.add("fallback");
+      }
+
+      function showToast(msg) {
+        toastEl.textContent = msg;
+        toastEl.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toastEl.classList.remove("show"), 2000);
+      }
+
+      async function copyText(text, successMsg) {
+        if (!text) return;
+        try {
+          await navigator.clipboard.writeText(text);
+          showToast(successMsg);
+        } catch (err) {
+          const temp = document.createElement("textarea");
+          temp.value = text;
+          document.body.appendChild(temp);
+          temp.select();
+          document.execCommand("copy");
+          document.body.removeChild(temp);
+          showToast(successMsg);
+        }
+      }
+
+      function escapeHtml(str) {
+        return str
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function cleanRawToken(token) {
+        return token
+          .trim()
+          .replace(/^["'`(<\[{]+/, "")
+          .replace(/["'`>)\]}.,;]+$/, "");
+      }
+
+      function fallbackExtractHost(raw) {
+        let str = raw.trim();
+        if (!str) return null;
+        if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(str)) {
+          str = "http://" + str;
+        }
+        try {
+          const u = new URL(str);
+          return u.hostname.toLowerCase().replace(/\.$/, "");
+        } catch {
+          return null;
+        }
+      }
+
+      function parseWithFallback(raw) {
+        const host = fallbackExtractHost(raw);
+        if (!host || !host.includes(".") || /^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+          return null;
+        }
+        const parts = host.split(".").filter(Boolean);
+        if (parts.length < 2) return null;
+
+        let suffixLen = 1;
+        if (parts.length >= 3) {
+          const last2 = parts.slice(-2).join(".");
+          if (FALLBACK_MULTI_SUFFIXES.has(last2)) {
+            suffixLen = 2;
+          }
+        }
+        if (parts.length <= suffixLen) return null;
+
+        const mainDomain = parts.slice(-(suffixLen + 1)).join(".");
+        const subParts = parts.slice(0, -(suffixLen + 1));
+        const subPrefix = subParts.join(".");
+        return {
+          mainDomain,
+          subPrefix,
+          subdomain: subPrefix ? host : "",
+          hasSubdomain: subParts.length > 0
+        };
+      }
+
+      function parseDomainFromInput(raw) {
+        const cleaned = cleanRawToken(raw);
+        if (!cleaned) return null;
+
+        if (hasTldts) {
+          const parsed = window.tldts.parse(cleaned, {
+            allowPrivateDomains: optAllowPrivate.checked,
+            allowIcannDomains: true
+          });
+          if (!parsed || parsed.isIp || !parsed.domain || !parsed.hostname) {
+            return null;
+          }
+          const hostname = parsed.hostname.toLowerCase();
+          const mainDomain = parsed.domain.toLowerCase();
+          const subPrefix = parsed.subdomain ? parsed.subdomain.toLowerCase() : "";
+
+          return {
+            mainDomain,
+            subPrefix,
+            subdomain: subPrefix ? hostname : "",
+            hasSubdomain: Boolean(subPrefix)
+          };
+        }
+
+        return parseWithFallback(cleaned);
+      }
+
+      function isWwwSubdomain(subPrefix) {
+        return subPrefix === "www" || subPrefix.startsWith("www.");
+      }
+
+      function processStep1() {
+        const rawText = urlInput.value || "";
+        const tokens = rawText
+          .split(/[\r\n,\t ]+/)
+          .map((t) => t.trim())
+          .filter(Boolean);
+
+        parsedRows = [];
+        uniqueMainDomains = [];
+        mainToSubsMap = new Map();
+        allMainDomainSet = new Set();
+
+        const seenPairs = new Set();
+        const uniqueSubSet = new Set();
+        let validCount = 0;
+        let skippedCount = 0;
+
+        for (const token of tokens) {
+          const res = parseDomainFromInput(token);
+
+          // Bỏ qua nếu lỗi, không có subdomain, hoặc subdomain dạng www.
+          if (
+            !res ||
+            !res.hasSubdomain ||
+            !res.subdomain ||
+            (optExcludeWww.checked && isWwwSubdomain(res.subPrefix))
+          ) {
+            skippedCount++;
+            continue;
+          }
+
+          validCount++;
+          const { mainDomain, subdomain } = res;
+
+          if (!allMainDomainSet.has(mainDomain)) {
+            allMainDomainSet.add(mainDomain);
+            uniqueMainDomains.push(mainDomain);
+          }
+
+          if (!mainToSubsMap.has(mainDomain)) {
+            mainToSubsMap.set(mainDomain, new Set());
+          }
+          mainToSubsMap.get(mainDomain).add(subdomain);
+          uniqueSubSet.add(subdomain);
+
+          const pairKey = `${mainDomain}|${subdomain}`;
+          if (optDedup.checked) {
+            if (seenPairs.has(pairKey)) continue;
+            seenPairs.add(pairKey);
+          }
+
+          parsedRows.push({ mainDomain, subdomain });
+        }
+
+        statValid.textContent = validCount;
+        statRows.textContent = parsedRows.length;
+        statUniqueMain.textContent = uniqueMainDomains.length;
+        statUniqueSub.textContent = uniqueSubSet.size;
+        statSkipped.textContent = skippedCount;
+
+        btnCopyMainDomains.disabled = uniqueMainDomains.length === 0;
+        btnCopyMainSubCsv.disabled = parsedRows.length === 0;
+
+        renderStep2Table();
+        processStep3();
+      }
+
+      function renderStep2Table() {
+        const keyword = (filterTableInput.value || "").trim().toLowerCase();
+        const filtered = keyword
+          ? parsedRows.filter(
+              (r) => r.mainDomain.includes(keyword) || r.subdomain.includes(keyword)
+            )
+          : parsedRows;
+
+        if (filtered.length === 0) {
+          parsedTableBody.innerHTML =
+            '<tr><td colspan="3" class="empty-state">Không có dữ liệu phù hợp (chỉ hiển thị URL có subdomain khác <code>www.</code>).</td></tr>';
+          return;
+        }
+
+        const html = filtered
+          .map(
+            (row, idx) => `
+              <tr>
+                <td class="col-idx">${idx + 1}</td>
+                <td class="tag-main">${escapeHtml(row.mainDomain)}</td>
+                <td class="tag-sub">${escapeHtml(row.subdomain)}</td>
+              </tr>
+            `
+          )
+          .join("");
+
+        parsedTableBody.innerHTML = html;
+      }
+
+      function extractDomainsFromAvailableText(text) {
+        const domainRegex = /[a-zA-Z0-9\u00a1-\uffff-]+(?:\.[a-zA-Z0-9\u00a1-\uffff-]+)+/g;
+        const matches = text.match(domainRegex) || [];
+        const results = [];
+        const seen = new Set();
+
+        for (const m of matches) {
+          const parsed = parseDomainFromInput(m);
+          const candidate = parsed ? parsed.mainDomain : m.toLowerCase();
+          if (!seen.has(candidate)) {
+            seen.add(candidate);
+            results.push(candidate);
+          }
+        }
+        return results;
+      }
+
+      function processStep3() {
+        const rawAvail = availableInput.value || "";
+        const availDomains = extractDomainsFromAvailableText(rawAvail);
+
+        matchedPairs = [];
+        const subSet = new Set();
+        let matchedMainCount = 0;
+        let notFoundCount = 0;
+
+        for (const dom of availDomains) {
+          if (mainToSubsMap.has(dom)) {
+            matchedMainCount++;
+            const subs = Array.from(mainToSubsMap.get(dom));
+            for (const sub of subs) {
+              matchedPairs.push({ mainDomain: dom, subdomain: sub });
+              subSet.add(sub);
+            }
+          } else {
+            notFoundCount++;
+          }
+        }
+
+        matchedSubList = Array.from(subSet);
+        const withHttps = optPrefixHttps.checked;
+        const outputLines = matchedSubList.map((s) => (withHttps ? `https://${s}` : s));
+
+        matchedSubOutput.value = outputLines.join("\n");
+        matchedSubCount.textContent = matchedSubList.length;
+        matchedHint.textContent = `Khớp: ${matchedMainCount} Main Domain | Không tìm thấy trong Bước 1: ${notFoundCount}`;
+
+        btnCopyMatchedSubs.disabled = matchedSubList.length === 0;
+        btnCopyMatchedPairs.disabled = matchedPairs.length === 0;
+
+        if (matchedPairs.length === 0) {
+          matchedTableBody.innerHTML =
+            '<tr><td colspan="3" class="empty-state">Chưa có kết quả khớp. Hãy dán danh sách Main Domain mua được ở ô trên.</td></tr>';
+          return;
+        }
+
+        matchedTableBody.innerHTML = matchedPairs
+          .map((row, idx) => {
+            const subDisplay = withHttps ? "https://" + row.subdomain : row.subdomain;
+            return `
+              <tr>
+                <td class="col-idx">${idx + 1}</td>
+                <td class="tag-main">${escapeHtml(row.mainDomain)}</td>
+                <td class="tag-sub">${escapeHtml(subDisplay)}</td>
+              </tr>
+            `;
+          })
+          .join("");
+      }
+
+      // Drag & Drop file helper
+      function attachFileDrop(textarea, onLoaded) {
+        textarea.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          textarea.classList.add("drag-over");
+        });
+        textarea.addEventListener("dragleave", () => {
+          textarea.classList.remove("drag-over");
+        });
+        textarea.addEventListener("drop", (e) => {
+          textarea.classList.remove("drag-over");
+          if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            e.preventDefault();
+            const file = e.dataTransfer.files[0];
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+              textarea.value = ev.target.result || "";
+              onLoaded();
+            };
+            reader.readAsText(file);
+          }
+        });
+      }
+
+      // Debounce
+      let parseTimer = null;
+      function scheduleStep1() {
+        clearTimeout(parseTimer);
+        parseTimer = setTimeout(processStep1, 150);
+      }
+
+      let matchTimer = null;
+      function scheduleStep3() {
+        clearTimeout(matchTimer);
+        matchTimer = setTimeout(processStep3, 120);
+      }
+
+      // Event Listeners
+      urlInput.addEventListener("input", scheduleStep1);
+      optAllowPrivate.addEventListener("change", processStep1);
+      optDedup.addEventListener("change", processStep1);
+      optExcludeWww.addEventListener("change", processStep1);
+      btnParse.addEventListener("click", processStep1);
+      filterTableInput.addEventListener("input", renderStep2Table);
+
+      availableInput.addEventListener("input", scheduleStep3);
+      optPrefixHttps.addEventListener("change", processStep3);
+
+      attachFileDrop(urlInput, processStep1);
+      attachFileDrop(availableInput, processStep3);
+
+      btnSample.addEventListener("click", () => {
+        urlInput.value = [
+          "https://help.yuntuweb.vip/",
+          "https://cdn.yuntuweb.vip/assets",
+          "https://www.yuntuweb.vip/",
+          "https://yuntuweb.vip/",
+          "https://pro.789club.co.in/",
+          "https://vip.789club.co.in/login",
+          "https://www.789club.co.in/",
+          "https://api.store.com.mx/v2",
+          "https://portal.demo.com.co/home",
+          "https://app.brand.in.net/dashboard"
+        ].join("\n");
+        availableInput.value = "789club.co.in\nbrand.in.net";
+        processStep1();
+      });
+
+      btnClearInput.addEventListener("click", () => {
+        urlInput.value = "";
+        filterTableInput.value = "";
+        processStep1();
+      });
+
+      btnClearAvail.addEventListener("click", () => {
+        availableInput.value = "";
+        processStep3();
+      });
+
+      btnCopyMainDomains.addEventListener("click", () => {
+        copyText(
+          uniqueMainDomains.join("\n"),
+          `Đã copy ${uniqueMainDomains.length} Main Domain duy nhất!`
+        );
+      });
+
+      btnCopyMainSubCsv.addEventListener("click", () => {
+        const lines = parsedRows.map((r) => `${r.mainDomain}\t${r.subdomain}`);
+        copyText(lines.join("\n"), `Đã copy ${parsedRows.length} dòng (2 cột Main & Subdomain)!`);
+      });
+
+      btnCopyMatchedSubs.addEventListener("click", () => {
+        copyText(
+          matchedSubOutput.value,
+          `Đã copy ${matchedSubList.length} Subdomain tương ứng!`
+        );
+      });
+
+      btnCopyMatchedPairs.addEventListener("click", () => {
+        const withHttps = optPrefixHttps.checked;
+        const lines = matchedPairs.map((r) => {
+          const sub = withHttps ? `https://${r.subdomain}` : r.subdomain;
+          return `${r.mainDomain}\t${sub}`;
+        });
+        copyText(lines.join("\n"), `Đã copy ${matchedPairs.length} dòng đối chiếu!`);
+      });
+    })();
+  </script>
+</body>
+</html>
